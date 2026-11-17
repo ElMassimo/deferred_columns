@@ -101,6 +101,11 @@ RSpec.describe 'Opting into deferred columns' do
       expect(Song.where(track: 1).select_all_columns.to_sql).to include(column(:songs, :waveform))
       expect(Playlist.select_all_columns.to_sql).to eq('SELECT "playlists".* FROM "playlists"')
     end
+
+    it 'is also available as with_deferred_columns' do
+      expect(Album.with_deferred_columns.to_sql).to eq(Album.select_all_columns.to_sql)
+      expect(abraxas.songs.with_deferred_columns.first.waveform).to eq('waveform-1')
+    end
   end
 
   describe 'select' do

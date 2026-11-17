@@ -34,6 +34,7 @@ module DeferredColumns
       deferred = klass.deferred_columns
       deferred.empty? ? self : extending(OptIn.new(deferred))
     end
+    alias with_deferred_columns select_all_columns
 
   private
 

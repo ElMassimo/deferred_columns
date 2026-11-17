@@ -50,7 +50,7 @@ This library makes leaving a column out the default, and loading it an explicit 
 ## Features ⚡️
 
 - One line per model, in the spirit of [`ignored_columns`][ignored_columns]
-- Opt in per query, with `with_deferred(:lyrics)` or `select_all_columns`
+- Opt in per query, with `with_deferred(:lyrics)` or `with_deferred_columns`
 - Applies to associations, `preload`, `includes`, `eager_load`, `joins` and single table inheritance
 - Leaves calculations alone: `count`, `pluck`, `exists?` and friends work as usual
 - Raises instead of running a query per record when a column wasn't loaded
@@ -101,10 +101,10 @@ Song.where(track: 1..3).with_deferred(:lyrics, :waveform)
 album.songs.with_deferred(:lyrics)
 ```
 
-`select_all_columns` loads every column, including the deferred ones:
+`with_deferred_columns` loads every column, including the deferred ones. It's also available as `select_all_columns`:
 
 ```ruby
-Album.select_all_columns.find(id)
+Album.with_deferred_columns.find(id)
 ```
 
 Passing a column that isn't deferred raises an `ArgumentError`, which catches typos early:

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add `with_deferred_columns` as an alias of `select_all_columns`.
+
 ## 0.0.1 (2026-11-17)
 
 - Initial release: `defer_columns`, `with_deferred`, `select_all_columns`, and `DeferredColumns::NotLoadedError`.
