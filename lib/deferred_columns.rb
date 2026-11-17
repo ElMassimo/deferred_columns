@@ -21,21 +21,24 @@ module DeferredColumns
     def initialize(model, column)
       @model = model
       @column = column
+      name = model.deferred_column_groups.find { |_group, columns| columns.include?(column) }&.first || column
       super(
         "#{model.name}##{column} is a deferred column, so it isn't loaded by default. " \
-        "Select it in the query, for example: #{model.name}.with_deferred(:#{column}), " \
-        "or load it into the record with load_deferred(:#{column})",
+        "Select it in the query, for example: #{model.name}.with_deferred(:#{name}), " \
+        "or load it into the record with load_deferred(:#{name})",
       )
     end
   end
 
-  # The given column names, as long as all of them are deferred in the model.
-  def self.deferred_columns!(model, columns)
-    columns = columns.flatten.map(&:to_s)
+  # The columns for the given names of deferred columns or groups, as long as
+  # all of them are deferred in the model.
+  def self.deferred_columns!(model, names)
+    groups = model.deferred_column_groups
+    columns = names.flatten.flat_map { |name| groups.fetch(name.to_s) { [name.to_s] } }.uniq
     unknown = columns - model.deferred_columns
     return columns if unknown.empty?
 
-    raise ArgumentError, "#{unknown.join(', ')} #{unknown.one? ? 'is not a deferred column' : 'are not deferred columns'} of #{model.name}"
+    raise ArgumentError, "#{unknown.join(', ')} #{unknown.one? ? 'is not a deferred column or group' : 'are not deferred columns or groups'} of #{model.name}"
   end
 
   # Whether the record was loaded without the given deferred column.

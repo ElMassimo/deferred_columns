@@ -5,15 +5,23 @@ module DeferredColumns
   module Model
     def self.extended(base)
       base.class_attribute :deferred_columns, instance_accessor: false, default: [].freeze
+      base.class_attribute :deferred_column_groups, instance_accessor: false, default: {}.freeze
     end
 
     # Leaves the given columns out of the default SELECT.
     #
     # Reading one of them on a record that was loaded without it raises
     # DeferredColumns::NotLoadedError, instead of running a query per record.
-    def defer_columns(*columns)
+    #
+    # Pass `as:` to name the group of columns, so that queries can opt into all
+    # of them with `with_deferred(:name)`.
+    def defer_columns(*columns, as: nil)
       columns = columns.flatten.map(&:to_s)
+      clashing = columns & deferred_column_groups.keys
+      raise ArgumentError, "#{clashing.join(', ')} already names a group of deferred columns in #{name}" if clashing.any?
+
       self.deferred_columns = (deferred_columns | columns).freeze
+      add_deferred_column_group(as.to_s, columns) if as
 
       columns.each do |column|
         deferred_column_readers.define_method(column) do
@@ -45,6 +53,13 @@ module DeferredColumns
     end
 
   private
+
+    def add_deferred_column_group(group, columns)
+      raise ArgumentError, "#{group} is a deferred column of #{name}, so it can't name a group" if deferred_columns.include?(group)
+
+      grouped = (deferred_column_groups.fetch(group, []) | columns).freeze
+      self.deferred_column_groups = deferred_column_groups.merge(group => grouped).freeze
+    end
 
     def deferred_column_readers
       @deferred_column_readers ||= Module.new.tap { |readers| include readers }

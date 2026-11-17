@@ -3,6 +3,7 @@
 ## 0.0.2 (2026-11-17)
 
 - Rename `select_all_columns` to `with_deferred_columns`.
+- Add named groups of deferred columns, with `defer_columns ..., as: :name`.
 - Add `load_deferred`, to load deferred columns into a record that was loaded without them.
 - Keep the deferred columns a record had loaded when calling `reload`.
 

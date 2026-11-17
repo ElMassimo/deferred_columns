@@ -51,6 +51,7 @@ This library makes leaving a column out the default, and loading it an explicit 
 
 - One line per model, in the spirit of [`ignored_columns`][ignored_columns]
 - Opt in per query, with `with_deferred(:lyrics)` or `with_deferred_columns`
+- Name groups of columns that are read together, and opt into them at once
 - Applies to associations, `preload`, `includes`, `eager_load`, `joins` and single table inheritance
 - Leaves calculations alone: `count`, `pluck`, `exists?` and friends work as usual
 - Raises instead of running a query per record when a column wasn't loaded
@@ -90,6 +91,25 @@ end
 
 LiveRecording.deferred_columns # => ["lyrics", "waveform", "crowd_noise"]
 ```
+
+### Grouping columns
+
+Pass `as:` to name a group of deferred columns that are usually read together:
+
+```ruby
+class Album < ApplicationRecord
+  defer_columns :liner_notes, :cover_art, as: :booklet
+end
+```
+
+Queries and records can then opt into the whole group by name, which keeps call sites short and in sync when the group changes:
+
+```ruby
+Album.with_deferred(:booklet)
+album.load_deferred(:booklet)
+```
+
+Groups can be mixed with column names, a column can belong to several groups, and declaring the same group again adds to it.
 
 ### Loading deferred columns
 

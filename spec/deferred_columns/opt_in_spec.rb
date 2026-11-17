@@ -71,11 +71,11 @@ RSpec.describe 'Opting into deferred columns' do
 
     it 'rejects columns that are not deferred' do
       expect { Song.with_deferred(:name) }
-        .to raise_error(ArgumentError, 'name is not a deferred column of Song')
+        .to raise_error(ArgumentError, 'name is not a deferred column or group of Song')
       expect { Song.with_deferred(:lyrics, :lirycs, :title) }
-        .to raise_error(ArgumentError, 'lirycs, title are not deferred columns of Song')
+        .to raise_error(ArgumentError, 'lirycs, title are not deferred columns or groups of Song')
       expect { Playlist.with_deferred(:lyrics) }
-        .to raise_error(ArgumentError, 'lyrics is not a deferred column of Playlist')
+        .to raise_error(ArgumentError, 'lyrics is not a deferred column or group of Playlist')
       expect { Song.with_deferred }
         .to raise_error(ArgumentError, 'with_deferred requires at least one column')
     end
@@ -83,7 +83,7 @@ RSpec.describe 'Opting into deferred columns' do
     it 'checks the columns of the relation model, not its base class' do
       expect(LiveRecording.with_deferred(:crowd_noise).first.crowd_noise).to eq('Applause')
       expect { Song.with_deferred(:crowd_noise) }
-        .to raise_error(ArgumentError, 'crowd_noise is not a deferred column of Song')
+        .to raise_error(ArgumentError, 'crowd_noise is not a deferred column or group of Song')
     end
   end
 

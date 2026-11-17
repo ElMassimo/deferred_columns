@@ -50,11 +50,12 @@ class Artist < ActiveRecord::Base
   defer_columns :biography
 
   has_many :albums
+  has_many :albums_with_booklet, -> { with_deferred(:booklet) }, class_name: 'Album'
 end
 
 class Album < ActiveRecord::Base
   self.ignored_columns += %w[legacy_label]
-  defer_columns :liner_notes, :cover_art
+  defer_columns :liner_notes, :cover_art, as: :booklet
 
   belongs_to :artist
   has_many :songs, -> { order(:track) }

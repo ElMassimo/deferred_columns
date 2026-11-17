@@ -53,7 +53,7 @@ RSpec.describe 'Loading deferred columns into a record' do
     end
 
     it 'rejects columns that are not deferred' do
-      expect { song.load_deferred(:name) }.to raise_error(ArgumentError, 'name is not a deferred column of Song')
+      expect { song.load_deferred(:name) }.to raise_error(ArgumentError, 'name is not a deferred column or group of Song')
     end
 
     it 'raises when the record no longer exists' do
