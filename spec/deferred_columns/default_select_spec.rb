@@ -100,9 +100,8 @@ RSpec.describe 'Leaving deferred columns out of the default SELECT' do
     expect(songs.first.has_attribute?(:lyrics)).to be(false)
   end
 
-  it 'leaves them out when reloading a record' do
-    song = Song.with_deferred(:lyrics).find_by!(name: 'Oye como va')
-    expect(song.lyrics).to eq('Lyrics for Oye como va')
+  it 'leaves them out when reloading a record loaded without them' do
+    song = Song.find_by!(name: 'Oye como va')
 
     expect(query { song.reload }).not_to include('lyrics')
     expect(song.has_attribute?(:lyrics)).to be(false)

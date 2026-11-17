@@ -18,13 +18,8 @@ module DeferredColumns
     # Loads the given deferred columns, along with the default ones. A query
     # that selects columns explicitly loads exactly those columns instead.
     def with_deferred(*columns)
-      columns = columns.flatten.map(&:to_s)
+      columns = DeferredColumns.deferred_columns!(klass, columns)
       raise ArgumentError, 'with_deferred requires at least one column' if columns.empty?
-
-      unknown = columns - klass.deferred_columns
-      if unknown.any?
-        raise ArgumentError, "#{unknown.join(', ')} #{unknown.one? ? 'is not a deferred column' : 'are not deferred columns'} of #{klass.name}"
-      end
 
       extending(OptIn.new(columns))
     end

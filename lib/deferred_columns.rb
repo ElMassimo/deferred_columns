@@ -23,9 +23,19 @@ module DeferredColumns
       @column = column
       super(
         "#{model.name}##{column} is a deferred column, so it isn't loaded by default. " \
-        "Select it in the query, for example: #{model.name}.with_deferred(:#{column})",
+        "Select it in the query, for example: #{model.name}.with_deferred(:#{column}), " \
+        "or load it into the record with load_deferred(:#{column})",
       )
     end
+  end
+
+  # The given column names, as long as all of them are deferred in the model.
+  def self.deferred_columns!(model, columns)
+    columns = columns.flatten.map(&:to_s)
+    unknown = columns - model.deferred_columns
+    return columns if unknown.empty?
+
+    raise ArgumentError, "#{unknown.join(', ')} #{unknown.one? ? 'is not a deferred column' : 'are not deferred columns'} of #{model.name}"
   end
 
   # Whether the record was loaded without the given deferred column.
@@ -38,12 +48,14 @@ module DeferredColumns
 end
 
 require 'deferred_columns/model'
+require 'deferred_columns/record'
 require 'deferred_columns/relation'
 require 'deferred_columns/join_part'
 require 'deferred_columns/validator'
 
 ActiveSupport.on_load(:active_record) do
   extend DeferredColumns::Model
+  include DeferredColumns::Record
   ActiveRecord::Relation.prepend(DeferredColumns::Relation)
 
   require 'active_record/associations/join_dependency/join_part'

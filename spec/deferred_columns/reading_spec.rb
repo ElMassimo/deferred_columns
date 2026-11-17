@@ -10,7 +10,8 @@ RSpec.describe 'Reading deferred columns' do
       expect { song.lyrics }.to raise_error(DeferredColumns::NotLoadedError) { |error|
         expect(error.message).to eq(
           "Song#lyrics is a deferred column, so it isn't loaded by default. " \
-          'Select it in the query, for example: Song.with_deferred(:lyrics)',
+          'Select it in the query, for example: Song.with_deferred(:lyrics), ' \
+          'or load it into the record with load_deferred(:lyrics)',
         )
         expect(error.model).to eq(Song)
         expect(error.column).to eq('lyrics')
@@ -26,7 +27,7 @@ RSpec.describe 'Reading deferred columns' do
   it 'names the subclass that was loaded' do
     live = LiveRecording.first
 
-    expect { live.crowd_noise }.to raise_error(DeferredColumns::NotLoadedError, /\ALiveRecording#crowd_noise .* LiveRecording\.with_deferred\(:crowd_noise\)\z/)
+    expect { live.crowd_noise }.to raise_error(DeferredColumns::NotLoadedError, /\ALiveRecording#crowd_noise .* LiveRecording\.with_deferred\(:crowd_noise\), /)
     expect { live.lyrics }.to raise_error(DeferredColumns::NotLoadedError, /\ALiveRecording#lyrics/)
   end
 

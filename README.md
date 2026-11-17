@@ -34,7 +34,7 @@ song = Song.find_by(name: "Oye como va")
 
 song.lyrics
 # DeferredColumns::NotLoadedError: Song#lyrics is a deferred column, so it isn't loaded by default.
-# Select it in the query, for example: Song.with_deferred(:lyrics)
+# Select it in the query, for example: Song.with_deferred(:lyrics), or load it into the record with load_deferred(:lyrics)
 ```
 
 ## Why? 🤔
@@ -119,6 +119,23 @@ An explicit `select` loads exactly the columns it names, deferred or not, and ta
 ```ruby
 Song.select(:id, :name, :lyrics)
 ```
+
+### Loading into a record you already have
+
+When a record comes from somewhere you can't add `with_deferred` to, such as a job argument or `self` in a callback, `load_deferred` loads the columns you name into it, in a single query:
+
+```ruby
+class RefreshLyricsJob < ApplicationJob
+  def perform(song)
+    song.load_deferred(:lyrics)
+    song.update!(lyrics: LyricsService.normalize(song.lyrics))
+  end
+end
+```
+
+Without arguments, it loads every deferred column the record doesn't have yet. It doesn't query when the columns are already loaded, or for new records.
+
+Prefer `with_deferred` when loading several records, so that they're loaded in the same query.
 
 ### Associations
 
@@ -223,10 +240,11 @@ Song.where(album: abraxas).pluck(:lyrics)
 
 ### Reloading
 
-`reload` loads the default columns again, which leaves out any deferred columns the record had loaded. To reload them, query again:
+`reload` keeps the deferred columns the record had loaded, reading their latest values in a second query, and leaves out the rest:
 
 ```ruby
-song = Song.with_deferred(:lyrics).find(song.id)
+song = Song.with_deferred(:lyrics).find(id)
+song.reload.lyrics # works
 ```
 
 ### What it doesn't do

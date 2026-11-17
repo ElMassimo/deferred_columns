@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Add `with_deferred_columns` as an alias of `select_all_columns`.
+- Add `load_deferred`, to load deferred columns into a record that was loaded without them.
+- Keep the deferred columns a record had loaded when calling `reload`.
 
 ## 0.0.1 (2026-11-17)
 
