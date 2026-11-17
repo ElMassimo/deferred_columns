@@ -63,6 +63,56 @@ RSpec.describe 'Loading deferred columns into a record' do
     end
   end
 
+  describe 'DeferredColumns.load' do
+    let!(:songs) { Album.find_by!(name: 'Abraxas').songs.to_a }
+
+    it 'loads the columns into many records with a single query' do
+      sql = query { expect(DeferredColumns.load(songs, :lyrics)).to eq(songs) }
+
+      expect(sql).to include(column(:songs, :lyrics)).and(include('IN ('))
+      expect(songs.map(&:lyrics)).to eq(Catalog::ABRAXAS.map { |name, _| "Lyrics for #{name}" })
+      expect(songs.none?(&:changed?)).to be(true)
+    end
+
+    it 'accepts groups, single records and relations' do
+      albums = Album.all.to_a
+      DeferredColumns.load(albums, :booklet)
+      expect(albums.map(&:liner_notes)).to all(be_present)
+
+      expect(DeferredColumns.load(Song.where(track: 3), :waveform).first.waveform).to eq('waveform-3')
+      expect(DeferredColumns.load(songs.first, :lyrics).first.lyrics).to start_with('Lyrics for')
+    end
+
+    it 'queries once per model' do
+      records = [songs.first, LiveRecording.first, songs.last]
+
+      expect(queries { DeferredColumns.load(records, :lyrics) }.size).to eq(2)
+      expect(records.map(&:lyrics)).to eq(['Lyrics for Singing Winds, Crying Beasts', 'Instrumental', 'Lyrics for El Nicoya'])
+    end
+
+    it 'only queries for what is missing' do
+      loaded = Song.with_deferred(:lyrics).where(track: 1..2).to_a
+
+      expect(queries { DeferredColumns.load(loaded, :lyrics) }).to be_empty
+      expect(queries { DeferredColumns.load([Song.new, Song.new], :lyrics) }).to be_empty
+      expect(queries { DeferredColumns.load([], :lyrics) }).to be_empty
+    end
+
+    it 'keeps values assigned before loading' do
+      songs.first.lyrics = 'Instrumental'
+      DeferredColumns.load(songs, :lyrics)
+
+      expect(songs.first.lyrics).to eq('Instrumental')
+      expect(songs.second.lyrics).to eq('Lyrics for Black Magic Woman / Gypsy Queen')
+    end
+
+    it 'raises when a record no longer exists' do
+      Song.where(id: songs.last.id).delete_all
+
+      expect { DeferredColumns.load(songs, :lyrics) }.to raise_error(ActiveRecord::RecordNotFound, /Couldn't find Song with 'id'=/)
+    end
+  end
+
   describe 'reload' do
     it 'keeps the deferred columns the record had loaded' do
       loaded = Song.with_deferred(:lyrics).find(song.id)

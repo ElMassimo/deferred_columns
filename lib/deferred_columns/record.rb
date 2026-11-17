@@ -3,19 +3,13 @@
 module DeferredColumns
   # Instance methods available in every Active Record model.
   module Record
-    # Loads deferred columns into a record that was loaded without them, in a
-    # single query. Without arguments, loads every deferred column it lacks.
+    # Loads deferred columns or groups into a record that was loaded without
+    # them, in a single query. Without arguments, loads every deferred column.
     #
     # Prefer `with_deferred` in the query that loads the records; this is for
     # records loaded elsewhere, such as job arguments or `self` in a callback.
-    def load_deferred(*columns)
-      columns = DeferredColumns.deferred_columns!(self.class, columns)
-      columns = self.class.deferred_columns if columns.empty?
-      missing = columns.reject { |column| has_attribute?(column) }
-      return self if missing.empty? || new_record?
-
-      row = self.class.unscoped.where(self.class.primary_key => id_in_database).select(*missing).take!
-      missing.each { |column| @attributes.write_from_database(column, row.read_attribute_before_type_cast(column)) }
+    def load_deferred(*names)
+      DeferredColumns.load(self, *names)
       self
     end
 
@@ -24,5 +18,35 @@ module DeferredColumns
       loaded = self.class.deferred_columns.select { |column| has_attribute?(column) }
       super.tap { load_deferred(*loaded) if loaded.any? }
     end
+
+  private
+
+    def load_deferred_column(column, value)
+      @attributes.write_from_database(column, value) unless has_attribute?(column)
+    end
+  end
+
+  # Loads deferred columns or groups into records that were loaded without them,
+  # with one query per model. Without names, loads every deferred column.
+  #
+  # Records that already have a column keep their value, and new records are
+  # skipped, so it only queries for what's missing.
+  def self.load(records, *names)
+    records = Array(records)
+    records.group_by(&:class).each do |model, siblings|
+      columns = deferred_columns!(model, names)
+      columns = model.deferred_columns if columns.empty?
+      persisted = siblings.reject(&:new_record?)
+      missing = columns.reject { |column| persisted.all? { |record| record.has_attribute?(column) } }
+      next if missing.empty?
+
+      primary_key = model.primary_key
+      rows = model.unscoped.where(primary_key => persisted.map(&:id_in_database)).select(primary_key, *missing).index_by(&:id)
+      persisted.each do |record|
+        row = rows.fetch(record.id_in_database) { raise ActiveRecord::RecordNotFound.new("Couldn't find #{model.name} with '#{primary_key}'=#{record.id_in_database}", model.name, primary_key) }
+        missing.each { |column| record.send(:load_deferred_column, column, row.read_attribute_before_type_cast(column)) }
+      end
+    end
+    records
   end
 end

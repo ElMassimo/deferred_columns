@@ -155,7 +155,13 @@ end
 
 Without arguments, it loads every deferred column the record doesn't have yet. It doesn't query when the columns are already loaded, or for new records.
 
-Prefer `with_deferred` when loading several records, so that they're loaded in the same query.
+For several records, such as a preloaded association or an array, `DeferredColumns.load` does the same with one query per model:
+
+```ruby
+DeferredColumns.load(album.songs, :lyrics)
+```
+
+Records that already have the columns keep their values, so it only queries for what's missing. Still, prefer `with_deferred` in the query that loads the records when you can, which needs no extra query.
 
 ### Associations
 
