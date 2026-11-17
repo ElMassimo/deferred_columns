@@ -6,6 +6,7 @@
 - Add named groups of deferred columns, with `defer_columns ..., as: :name`.
 - Add `load_deferred`, to load deferred columns into a record that was loaded without them.
 - Add `DeferredColumns.load`, to load deferred columns into many records with one query per model.
+- Raise `NotLoadedError` from `read_attribute` and `[]` too, instead of returning `nil`.
 - Keep the deferred columns a record had loaded when calling `reload`.
 
 ## 0.0.1 (2026-11-17)

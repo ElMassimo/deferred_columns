@@ -13,6 +13,18 @@ module DeferredColumns
       self
     end
 
+    # Raises instead of returning nil for deferred columns that weren't loaded,
+    # which also applies to `record[column]`.
+    def read_attribute(name, &)
+      if self.class.deferred_columns.any?
+        column = name.to_s
+        column = self.class.attribute_aliases.fetch(column, column)
+        raise NotLoadedError.new(self.class, column) if DeferredColumns.unloaded?(self, column)
+      end
+
+      super
+    end
+
     # Reloads the record, keeping the deferred columns it had loaded.
     def reload(*)
       loaded = self.class.deferred_columns.select { |column| has_attribute?(column) }

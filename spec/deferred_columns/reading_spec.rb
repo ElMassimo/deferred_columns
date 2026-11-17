@@ -44,14 +44,21 @@ RSpec.describe 'Reading deferred columns' do
     expect(Song.new.lyrics).to be_nil
   end
 
-  it 'keeps the other ways of reading attributes as Active Record defines them for unselected columns' do
+  it 'raises the same error from read_attribute and []' do
+    expect { song[:lyrics] }.to raise_error(DeferredColumns::NotLoadedError, /\ASong#lyrics is a deferred column/)
+    expect { song['waveform'] }.to raise_error(DeferredColumns::NotLoadedError, /\ASong#waveform is a deferred column/)
+    expect { song.read_attribute(:lyrics) }.to raise_error(DeferredColumns::NotLoadedError)
+    expect(Song.with_deferred(:lyrics).find(song.id)[:lyrics]).to eq('Lyrics for Black Magic Woman / Gypsy Queen')
+    expect(song[:name]).to eq('Black Magic Woman / Gypsy Queen')
+  end
+
+  it 'leaves other unselected columns as Active Record defines them' do
     unselected = Song.select(:id).find(song.id)
 
     expect(song.has_attribute?(:lyrics)).to be(false)
     expect(song.has_attribute?(:name)).to be(true)
-    expect { song[:lyrics] }.to raise_error(ActiveModel::MissingAttributeError)
     expect { unselected[:name] }.to raise_error(ActiveModel::MissingAttributeError)
-    expect(song.read_attribute(:lyrics)).to eq(unselected.read_attribute(:name))
+    expect(unselected.read_attribute(:name)).to be_nil
     expect(Song.attribute_names).to include('lyrics', 'waveform')
   end
 

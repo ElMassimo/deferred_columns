@@ -200,7 +200,7 @@ song.as_json                 # leaves lyrics out
 
 The error is a subclass of `ActiveModel::MissingAttributeError`, so existing rescues keep working. It also exposes `model` and `column`.
 
-Other ways of reading attributes, such as `song[:lyrics]` and `read_attribute(:lyrics)`, behave as they do for any column a query didn't select.
+`song[:lyrics]` and `read_attribute(:lyrics)` raise the same error, instead of returning `nil` as Active Record does for other columns a query didn't select.
 
 New records have every column, so `Song.new.lyrics` works as usual.
 
