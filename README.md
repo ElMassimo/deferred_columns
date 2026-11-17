@@ -62,7 +62,7 @@ This library makes leaving a column out the default, and loading it an explicit 
 Add this line to your application's Gemfile:
 
 ```ruby
-gem 'deferred_columns', github: 'ElMassimo/deferred_columns'
+gem 'deferred_columns'
 ```
 
 And then run:
