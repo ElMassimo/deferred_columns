@@ -101,7 +101,7 @@ Song.where(track: 1..3).with_deferred(:lyrics, :waveform)
 album.songs.with_deferred(:lyrics)
 ```
 
-`with_deferred_columns` loads every column, including the deferred ones. It's also available as `select_all_columns`:
+`with_deferred_columns` loads every column, including the deferred ones:
 
 ```ruby
 Album.with_deferred_columns.find(id)

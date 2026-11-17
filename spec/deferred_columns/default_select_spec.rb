@@ -109,7 +109,7 @@ RSpec.describe 'Leaving deferred columns out of the default SELECT' do
 
   it 'respects ignored_columns' do
     expect(Album.default_select_columns).to eq(%w[id artist_id name release_date])
-    expect(Album.select_all_columns.to_sql).not_to include('legacy_label')
+    expect(Album.with_deferred_columns.to_sql).not_to include('legacy_label')
   end
 
   it 'loads nothing for none' do

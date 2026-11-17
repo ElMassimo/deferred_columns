@@ -87,9 +87,9 @@ RSpec.describe 'Opting into deferred columns' do
     end
   end
 
-  describe 'select_all_columns' do
+  describe 'with_deferred_columns' do
     it 'loads every column, including the deferred ones' do
-      album = Album.select_all_columns.find_by!(name: 'Abraxas')
+      album = Album.with_deferred_columns.find_by!(name: 'Abraxas')
 
       expect(album.attributes.keys).to eq(%w[id artist_id name release_date liner_notes cover_art])
       expect(album.liner_notes).to eq('Recorded at Wally Heider Studios, San Francisco.')
@@ -97,14 +97,9 @@ RSpec.describe 'Opting into deferred columns' do
     end
 
     it 'works on relations and associations, and keeps SELECT * for models without deferred columns' do
-      expect(abraxas.songs.select_all_columns.first.lyrics).to eq('Lyrics for Singing Winds, Crying Beasts')
-      expect(Song.where(track: 1).select_all_columns.to_sql).to include(column(:songs, :waveform))
-      expect(Playlist.select_all_columns.to_sql).to eq('SELECT "playlists".* FROM "playlists"')
-    end
-
-    it 'is also available as with_deferred_columns' do
-      expect(Album.with_deferred_columns.to_sql).to eq(Album.select_all_columns.to_sql)
-      expect(abraxas.songs.with_deferred_columns.first.waveform).to eq('waveform-1')
+      expect(abraxas.songs.with_deferred_columns.first.lyrics).to eq('Lyrics for Singing Winds, Crying Beasts')
+      expect(Song.where(track: 1).with_deferred_columns.to_sql).to include(column(:songs, :waveform))
+      expect(Playlist.with_deferred_columns.to_sql).to eq('SELECT "playlists".* FROM "playlists"')
     end
   end
 

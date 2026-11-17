@@ -30,10 +30,9 @@ module DeferredColumns
     end
 
     # Loads every column, including the deferred ones.
-    def select_all_columns
-      all.select_all_columns
+    def with_deferred_columns
+      all.with_deferred_columns
     end
-    alias with_deferred_columns select_all_columns
 
     # The columns loaded by a query that doesn't select any explicitly.
     def default_select_columns

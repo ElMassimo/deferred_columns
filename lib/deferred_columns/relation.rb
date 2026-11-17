@@ -25,11 +25,10 @@ module DeferredColumns
     end
 
     # Loads every column, including the deferred ones.
-    def select_all_columns
+    def with_deferred_columns
       deferred = klass.deferred_columns
       deferred.empty? ? self : extending(OptIn.new(deferred))
     end
-    alias with_deferred_columns select_all_columns
 
   private
 

@@ -6,7 +6,7 @@ RSpec.describe 'Calculations on models with deferred columns' do
   [
     -> { Song.all },
     -> { Song.with_deferred(:lyrics) },
-    -> { Song.select_all_columns },
+    -> { Song.with_deferred_columns },
   ].each.with_index do |relation, index|
     describe "on relation ##{index + 1}" do
       let(:songs) { instance_exec(&relation).where(album: abraxas) }
