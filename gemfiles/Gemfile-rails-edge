@@ -1,0 +1,7 @@
+require_relative "base"
+
+eval main_gemfile
+
+gem "activerecord", github: "rails/rails", branch: "main", glob: "activerecord/*.gemspec"
+gem "activemodel", github: "rails/rails", branch: "main", glob: "activemodel/*.gemspec"
+gem "activesupport", github: "rails/rails", branch: "main", glob: "activesupport/*.gemspec"

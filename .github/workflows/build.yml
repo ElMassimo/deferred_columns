@@ -1,0 +1,67 @@
+name: build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  test:
+    name: RSpec (Ruby ${{ matrix.ruby }}, ${{ matrix.gemfile }}, ${{ matrix.database }})
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { ruby: '3.3', gemfile: Gemfile-rails.7.2.x, database: sqlite, experimental: false }
+          - { ruby: '3.4', gemfile: Gemfile-rails.8.0.x, database: sqlite, experimental: false }
+          - { ruby: '3.4', gemfile: Gemfile-rails.8.1.x, database: sqlite, experimental: false }
+          - { ruby: '4.0', gemfile: Gemfile-rails.8.1.x, database: postgres, experimental: false }
+          - { ruby: '4.0', gemfile: Gemfile-rails-edge, database: sqlite, experimental: true }
+          - { ruby: '4.0', gemfile: Gemfile-rails-edge, database: postgres, experimental: true }
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: deferred_columns_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      BUNDLE_GEMFILE: ${{ github.workspace }}/gemfiles/${{ matrix.gemfile }}
+      DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgres://postgres:postgres@localhost:5432/deferred_columns_test' || '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+
+      - name: Run tests
+        run: bin/rspec
+
+  rubocop:
+    name: RuboCop
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+          bundler-cache: true
+
+      - name: Run RuboCop
+        run: bundle exec rubocop
