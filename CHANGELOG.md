@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.2 (2026-11-17)
+## 0.0.2 (2026-11-18)
 
 - Rename `select_all_columns` to `with_deferred_columns`.
 - Add named groups of deferred columns, with `defer_columns ..., as: :name`.
