@@ -175,16 +175,14 @@ class Album < ApplicationRecord
   has_many :songs_with_lyrics, -> { with_deferred(:lyrics) }, class_name: "Song"
 end
 
-Album.preload(:songs_with_lyrics)
+Album.includes(:songs_with_lyrics)
 ```
 
-> **Note**
->
-> `eager_load` builds a single query for every model involved, and always uses their default columns. Use `preload` with a scoped association instead, or select the table explicitly:
->
-> ```ruby
-> Song.eager_load(:album).select(Song.arel_table[Arel.star])
-> ```
+It works with `preload`, `includes` and `eager_load`, and with `has_many :through`. In `eager_load`, opt-ins on the query apply to its own model:
+
+```ruby
+Song.with_deferred(:lyrics).eager_load(:album)
+```
 
 ### Reading deferred columns
 

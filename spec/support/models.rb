@@ -82,6 +82,7 @@ end
 class Playlist < ActiveRecord::Base
   has_many :playlist_entries, -> { order(:position) }
   has_many :songs, through: :playlist_entries
+  has_many :songs_with_waveform, -> { with_deferred(:waveform) }, through: :playlist_entries, source: :song
 end
 
 class PlaylistEntry < ActiveRecord::Base

@@ -8,6 +8,7 @@
 - Add `DeferredColumns.load`, to load deferred columns into many records with one query per model.
 - Raise `NotLoadedError` from `read_attribute` and `[]` too, instead of returning `nil`.
 - Keep the deferred columns a record had loaded when calling `reload`.
+- Respect opt-ins in `eager_load`, and in `includes` when it eager loads, both in the query and in association scopes.
 
 ## 0.0.1 (2026-11-17)
 

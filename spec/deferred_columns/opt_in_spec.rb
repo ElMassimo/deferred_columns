@@ -55,6 +55,42 @@ RSpec.describe 'Opting into deferred columns' do
       expect(albums.first.songs_with_lyrics.map(&:lyrics)).to all(start_with('Lyrics for'))
     end
 
+    it 'works in association scopes when eager loading' do
+      [
+        -> { Album.eager_load(:songs_with_lyrics) },
+        -> { Album.includes(:songs_with_lyrics).where(songs: { track: 1..9 }) },
+        -> { Album.includes(:songs_with_lyrics).references(:songs) },
+      ].each do |relation|
+        album = nil
+        sql = query { album = instance_exec(&relation).where(name: 'Abraxas').to_a.sole }
+
+        expect(sql).to include(%("songs"."lyrics" AS))
+        expect(sql).not_to include('waveform')
+        expect(album.songs_with_lyrics.map(&:lyrics)).to all(start_with('Lyrics for'))
+        expect(album.has_attribute?(:liner_notes)).to be(false)
+      end
+    end
+
+    it 'works in through association scopes, when preloading or eager loading' do
+      %i[preload eager_load].each do |strategy|
+        playlist = Playlist.public_send(strategy, :songs_with_waveform).find_by!(name: 'Latin Rock')
+
+        expect(playlist.songs_with_waveform.map(&:waveform)).to all(start_with('waveform-'))
+        expect(playlist.songs_with_waveform.first.has_attribute?(:lyrics)).to be(false)
+      end
+    end
+
+    it 'loads them for the root model when eager loading' do
+      song = nil
+      sql = query { song = Song.with_deferred(:lyrics).eager_load(:album).find_by!(name: 'El Nicoya') }
+
+      expect(sql).to include(%("songs"."lyrics" AS))
+      expect(sql).not_to match(/waveform|liner_notes/)
+      expect(song.lyrics).to eq('Lyrics for El Nicoya')
+      expect(song.album.has_attribute?(:liner_notes)).to be(false)
+      expect(Album.with_deferred(:booklet).eager_load(:songs).find_by!(name: 'Abraxas').songs.first.has_attribute?(:lyrics)).to be(false)
+    end
+
     it 'keeps counting rows, and plucking only what was asked for' do
       relation = Song.with_deferred(:lyrics, :waveform).where(album: abraxas)
 

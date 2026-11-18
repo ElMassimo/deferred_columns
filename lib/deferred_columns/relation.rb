@@ -36,13 +36,19 @@ module DeferredColumns
       deferred = klass.deferred_columns
       return super if deferred.empty? || select_values.any?
 
-      opted = deferred_columns_opted_into & deferred
+      opted = DeferredColumns.opted_into(self) & deferred
       loaded = opted.empty? ? klass.default_select_columns : klass.column_names - (deferred - opted)
       arel.project(*loaded.map { |column| table[column] })
     end
 
-    def deferred_columns_opted_into
-      extending_values.grep(OptIn).flat_map(&:columns).uniq
+    # Passes the opt-ins to the root of `eager_load`, which selects its columns.
+    def construct_join_dependency(...)
+      super.tap { |dependency| dependency.send(:join_root).deferred_columns_opted_into = DeferredColumns.opted_into(self) }
     end
+  end
+
+  # The deferred columns a query opted into.
+  def self.opted_into(relation)
+    relation.extending_values.grep(Relation::OptIn).flat_map(&:columns).uniq
   end
 end
