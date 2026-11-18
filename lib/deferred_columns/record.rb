@@ -19,7 +19,7 @@ module DeferredColumns
       if self.class.deferred_columns.any?
         column = name.to_s
         column = self.class.attribute_aliases.fetch(column, column)
-        raise NotLoadedError.new(self.class, column) if DeferredColumns.unloaded?(self, column)
+        DeferredColumns.not_loaded!(self, NotLoadedError.new(self.class, column)) if DeferredColumns.unloaded?(self, column)
       end
 
       super
@@ -53,10 +53,15 @@ module DeferredColumns
       next if missing.empty?
 
       primary_key = model.primary_key
-      rows = model.unscoped.where(primary_key => persisted.map(&:id_in_database)).select(primary_key, *missing).index_by(&:id)
+      query = model.unscoped.where(primary_key => persisted.map(&:id_in_database)).select(primary_key, *missing)
+      # Reads raw values, which the records cast when read, without instantiating
+      # a record per row or running its callbacks.
+      rows = model.with_connection { |connection| connection.select_rows(query.arel, "#{model.name} Load Deferred") }
+      key_type = model.type_for_attribute(primary_key)
+      rows = rows.index_by { |row| key_type.deserialize(row.first) }
       persisted.each do |record|
         row = rows.fetch(record.id_in_database) { raise ActiveRecord::RecordNotFound.new("Couldn't find #{model.name} with '#{primary_key}'=#{record.id_in_database}", model.name, primary_key) }
-        missing.each { |column| record.send(:load_deferred_column, column, row.read_attribute_before_type_cast(column)) }
+        missing.each.with_index(1) { |column, index| record.send(:load_deferred_column, column, row[index]) }
       end
     end
     records

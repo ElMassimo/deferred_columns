@@ -18,16 +18,38 @@ module DeferredColumns
   class NotLoadedError < ActiveModel::MissingAttributeError
     attr_reader :model, :column
 
-    def initialize(model, column)
+    def initialize(model, column, message = nil)
       @model = model
       @column = column
       name = model.deferred_column_groups.find { |_group, columns| columns.include?(column) }&.first || column
-      super(
-        "#{model.name}##{column} is a deferred column, so it isn't loaded by default. " \
-        "Select it in the query, for example: #{model.name}.with_deferred(:#{name}), " \
-        "or load it into the record with load_deferred(:#{name})",
-      )
+      super(message || "#{model.name}##{column} is a deferred column, so it isn't loaded by default. " \
+                       "Select it in the query, for example: #{model.name}.with_deferred(:#{name}), " \
+                       "or load it into the record with load_deferred(:#{name})")
     end
+  end
+
+  class << self
+    # Called with a NotLoadedError when code reads a deferred column that wasn't
+    # loaded, or preloads an association that was already loaded without the
+    # deferred columns its scope opts into. Raises the error by default.
+    #
+    # When it returns instead, the missing columns are loaded with an extra
+    # query and the code carries on, so production can report the error and
+    # keep working:
+    #
+    #   DeferredColumns.on_not_loaded = ->(error) {
+    #     Rails.env.local? ? raise(error) : Rails.error.report(error)
+    #   }
+    attr_accessor :on_not_loaded
+  end
+  self.on_not_loaded = ->(error) { raise error }
+
+  # Internal: Hands the error to `on_not_loaded`, and loads the columns into
+  # the records if it doesn't raise.
+  def self.not_loaded!(records, error, columns = [error.column])
+    error.set_backtrace(caller(1))
+    on_not_loaded.call(error)
+    load(records, *columns)
   end
 
   # The columns for the given names of deferred columns or groups, as long as
@@ -54,6 +76,7 @@ require 'deferred_columns/model'
 require 'deferred_columns/record'
 require 'deferred_columns/relation'
 require 'deferred_columns/join_part'
+require 'deferred_columns/preloader'
 require 'deferred_columns/validator'
 
 ActiveSupport.on_load(:active_record) do
@@ -63,6 +86,7 @@ ActiveSupport.on_load(:active_record) do
 
   require 'active_record/associations/join_dependency/join_part'
   ActiveRecord::Associations::JoinDependency::JoinPart.prepend(DeferredColumns::JoinPart)
+  ActiveRecord::Associations::Preloader::Association.prepend(DeferredColumns::Preloader)
 end
 
 ActiveModel::EachValidator.prepend(DeferredColumns::Validator)

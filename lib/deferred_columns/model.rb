@@ -11,7 +11,8 @@ module DeferredColumns
     # Leaves the given columns out of the default SELECT.
     #
     # Reading one of them on a record that was loaded without it raises
-    # DeferredColumns::NotLoadedError, instead of running a query per record.
+    # DeferredColumns::NotLoadedError, instead of running a query per record,
+    # unless DeferredColumns.on_not_loaded is configured to report it instead.
     #
     # Pass `as:` to name the group of columns, so that queries can opt into all
     # of them with `with_deferred(:name)`.
@@ -25,7 +26,7 @@ module DeferredColumns
 
       columns.each do |column|
         deferred_column_readers.define_method(column) do
-          raise NotLoadedError.new(self.class, column) unless has_attribute?(column)
+          DeferredColumns.not_loaded!(self, NotLoadedError.new(self.class, column)) unless has_attribute?(column)
 
           super()
         end

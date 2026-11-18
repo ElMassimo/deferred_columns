@@ -9,6 +9,9 @@
 - Raise `NotLoadedError` from `read_attribute` and `[]` too, instead of returning `nil`.
 - Keep the deferred columns a record had loaded when calling `reload`.
 - Respect opt-ins in `eager_load`, and in `includes` when it eager loads, both in the query and in association scopes.
+- Add `DeferredColumns.on_not_loaded`, to report a missing deferred column instead of raising, and load it with an extra query.
+- Detect associations that were already loaded without the deferred columns that a preload scope opts into.
+- Load deferred columns in `DeferredColumns.load` and `load_deferred` without instantiating a record per row.
 
 ## 0.0.1 (2026-11-17)
 

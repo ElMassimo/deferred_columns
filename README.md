@@ -54,7 +54,7 @@ This library makes leaving a column out the default, and loading it an explicit 
 - Name groups of columns that are read together, and opt into them at once
 - Applies to associations, `preload`, `includes`, `eager_load`, `joins` and single table inheritance
 - Leaves calculations alone: `count`, `pluck`, `exists?` and friends work as usual
-- Raises instead of running a query per record when a column wasn't loaded
+- Raises instead of running a query per record when a column wasn't loaded, or reports it in production
 - Skips validations of deferred columns that weren't loaded
 - No `default_scope`, and models without deferred columns keep `SELECT *`
 
@@ -161,7 +161,7 @@ For several records, such as a preloaded association or an array, `DeferredColum
 DeferredColumns.load(album.songs, :lyrics)
 ```
 
-Records that already have the columns keep their values, so it only queries for what's missing. Still, prefer `with_deferred` in the query that loads the records when you can, which needs no extra query.
+Records that already have the columns keep their values, so it only queries for what's missing. It reads the values without instantiating a record per row. Still, prefer `with_deferred` in the query that loads the records when you can, which needs no extra query.
 
 ### Associations
 
@@ -184,6 +184,14 @@ It works with `preload`, `includes` and `eager_load`, and with `has_many :throug
 Song.with_deferred(:lyrics).eager_load(:album)
 ```
 
+Active Record skips preloading an association that is already loaded. When the records it has lack the deferred columns that the preload opts into, the library raises `NotLoadedError` instead of leaving them out:
+
+```ruby
+album.songs.load
+ActiveRecord::Associations::Preloader.new(records: [album], associations: :songs, scope: Song.with_deferred(:lyrics)).call
+# DeferredColumns::NotLoadedError: Album#songs was already loaded without Song#lyrics, ...
+```
+
 ### Reading deferred columns
 
 Reading a deferred column that the query didn't load raises `DeferredColumns::NotLoadedError`, without running a query:
@@ -201,6 +209,23 @@ The error is a subclass of `ActiveModel::MissingAttributeError`, so existing res
 `song[:lyrics]` and `read_attribute(:lyrics)` raise the same error, instead of returning `nil` as Active Record does for other columns a query didn't select.
 
 New records have every column, so `Song.new.lyrics` works as usual.
+
+### Reporting instead of raising
+
+Raising makes a missing `with_deferred` hard to miss in development and tests. In production, you might prefer to report it and keep the request working. `DeferredColumns.on_not_loaded` receives every `NotLoadedError` before it's raised:
+
+```ruby
+# config/initializers/deferred_columns.rb
+DeferredColumns.on_not_loaded = ->(error) {
+  Rails.env.local? ? raise(error) : Rails.error.report(error)
+}
+```
+
+When the handler doesn't raise, the library loads the missing column with an extra query and returns its value. The same applies to associations that were already loaded without the columns a preload opts into, which load them with one query per model.
+
+That's one query per record when reading a column in a loop, so treat each report as a missing `with_deferred` to fix.
+
+### Overriding readers
 
 You can override the reader in the model and call `super`:
 
@@ -273,7 +298,7 @@ song.reload.lyrics # works
 
 ### What it doesn't do
 
-- It doesn't load deferred columns lazily. A query per record is easy to miss and expensive in a loop, so missing columns raise instead.
+- It doesn't load deferred columns lazily by default. A query per record is easy to miss and expensive in a loop, so missing columns raise instead, unless [`on_not_loaded`](#reporting-instead-of-raising) reports them.
 - It doesn't change raw SQL, such as `find_by_sql`.
 - It only changes reads. If a column is expensive to write, for example because of a large index, moving it to a separate table is still the better fit.
 
