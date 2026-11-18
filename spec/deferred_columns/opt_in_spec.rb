@@ -91,6 +91,12 @@ RSpec.describe 'Opting into deferred columns' do
       expect(Album.with_deferred(:booklet).eager_load(:songs).find_by!(name: 'Abraxas').songs.first.has_attribute?(:lyrics)).to be(false)
     end
 
+    it 'merges the joins of a relation of another model' do
+      relation = Album.joins(:songs).merge(Song.joins(:playlist_entries)).distinct
+
+      expect(relation.pluck(:name)).to contain_exactly('Abraxas')
+    end
+
     it 'keeps counting rows, and plucking only what was asked for' do
       relation = Song.with_deferred(:lyrics, :waveform).where(album: abraxas)
 

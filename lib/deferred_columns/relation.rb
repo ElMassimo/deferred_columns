@@ -30,6 +30,13 @@ module DeferredColumns
       deferred.empty? ? self : extending(OptIn.new(deferred))
     end
 
+    # Passes the opt-ins to the root of `eager_load`, which selects its columns.
+    # Public like the Rails method, which merges and association scopes call on
+    # other relations.
+    def construct_join_dependency(...) # :nodoc:
+      super.tap { |dependency| dependency.send(:join_root).deferred_columns_opted_into = DeferredColumns.opted_into(self) }
+    end
+
   private
 
     def build_select(arel)
@@ -39,11 +46,6 @@ module DeferredColumns
       opted = DeferredColumns.opted_into(self) & deferred
       loaded = opted.empty? ? klass.default_select_columns : klass.column_names - (deferred - opted)
       arel.project(*loaded.map { |column| table[column] })
-    end
-
-    # Passes the opt-ins to the root of `eager_load`, which selects its columns.
-    def construct_join_dependency(...)
-      super.tap { |dependency| dependency.send(:join_root).deferred_columns_opted_into = DeferredColumns.opted_into(self) }
     end
   end
 
