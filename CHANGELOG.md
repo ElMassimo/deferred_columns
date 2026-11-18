@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.3 (2026-11-18)
+
+- Fix `NoMethodError` for the private `construct_join_dependency` when merging joins of another model, or in association scopes that reference an eager loaded association.
+
 ## 0.0.2 (2026-11-18)
 
 - Rename `select_all_columns` to `with_deferred_columns`.
