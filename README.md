@@ -9,54 +9,27 @@ Deferred Columns
 [Active Record]: https://guides.rubyonrails.org/active_record_basics.html
 [ignored_columns]: https://api.rubyonrails.org/classes/ActiveRecord/ModelSchema/ClassMethods.html#method-i-ignored_columns-3D
 [columns_on_demand]: https://github.com/willbryant/columns_on_demand
-[Issues]: https://github.com/ElMassimo/deferred_columns/issues
 
-Leave heavy columns out of the default `SELECT` of your [Active Record] models, and load them only in the queries that need them.
+Leave large columns out of [Active Record] queries by default.
 
 ```ruby
 class Song < ApplicationRecord
   defer_columns :lyrics, :waveform
 end
-```
 
-```ruby
-Song.where(album: abraxas)
-# SELECT "songs"."id", "songs"."album_id", "songs"."track", "songs"."name", "songs"."composer"
-# FROM "songs" WHERE "songs"."album_id" = 1
-
-Song.with_deferred(:lyrics).where(album: abraxas)
-# SELECT "songs"."id", "songs"."album_id", "songs"."track", "songs"."name", "songs"."composer", "songs"."lyrics"
-# FROM "songs" WHERE "songs"."album_id" = 1
-```
-
-```ruby
-song = Song.find_by(name: "Oye como va")
-
-song.lyrics
-# DeferredColumns::NotLoadedError: Song#lyrics is a deferred column, so it isn't loaded by default.
-# Select it in the query, for example: Song.with_deferred(:lyrics), or load it into the record with load_deferred(:lyrics)
+album.songs                        # no lyrics or waveform
+album.songs.with_deferred(:lyrics) # includes lyrics in the same query
 ```
 
 ## Why? 🤔
 
-Active Record loads every column of a table, whether or not the code reads it.
+An album page only needs a track list, but by default `album.songs` fetches the lyrics and waveform for every song.
 
-Most tables have a few columns that are much larger than the rest, and that only one or two places need: lyrics, documents, JSON payloads, binary blobs, embeddings. Every other query still transfers them from the database, decodes them, and allocates them.
+You could use `select`, but then every query that loads songs needs a list of columns to keep.
+[`ignored_columns`][ignored_columns] goes too far: you still want the lyrics on the song page.
 
-Selecting columns explicitly works for a single query, but it's easy to miss one, and it doesn't apply to associations. [`ignored_columns`][ignored_columns] removes the column from the model altogether, so there's nothing to opt into.
-
-This library makes leaving a column out the default, and loading it an explicit choice in the query.
-
-## Features ⚡️
-
-- One line per model, in the spirit of [`ignored_columns`][ignored_columns]
-- Opt in per query, with `with_deferred(:lyrics)` or `with_deferred_columns`
-- Name groups of columns that are read together, and opt into them at once
-- Applies to associations, `preload`, `includes`, `eager_load`, `joins` and single table inheritance
-- Leaves calculations alone: `count`, `pluck`, `exists?` and friends work as usual
-- Raises instead of running a query per record when a column wasn't loaded, or reports it in production
-- Skips validations of deferred columns that weren't loaded
-- No `default_scope`, and models without deferred columns keep `SELECT *`
+With `defer_columns`, only the query for the song page needs to change.
+If you forget to select the lyrics, `song.lyrics` raises rather than quietly running another query.
 
 ## Installation 💿
 
@@ -72,17 +45,20 @@ And then run:
 
 ## Usage 🚀
 
-### Declaring deferred columns
+### Loading deferred columns
 
-Call `defer_columns` in any model:
+Use `with_deferred` to add one or more columns to the ones you'd normally get:
 
 ```ruby
-class Album < ApplicationRecord
-  defer_columns :liner_notes, :cover_art
-end
+Song.with_deferred(:lyrics).find_by(name: "Oye como va")
+album.songs.with_deferred(:lyrics, :waveform)
+Song.with_deferred_columns.find(id) # all columns
 ```
 
-Subclasses inherit the deferred columns of their parent, and can add their own:
+An unknown column or group raises `ArgumentError`. If you use `select`, Active Record
+loads exactly the columns you name, even on a relation with `with_deferred`.
+
+Subclasses inherit their parent's deferred columns and can add their own:
 
 ```ruby
 class LiveRecording < Song
@@ -94,80 +70,23 @@ LiveRecording.deferred_columns # => ["lyrics", "waveform", "crowd_noise"]
 
 ### Grouping columns
 
-Pass `as:` to name a group of deferred columns that are usually read together:
+If you usually read a few columns together, give them a name:
 
 ```ruby
 class Album < ApplicationRecord
   defer_columns :liner_notes, :cover_art, as: :booklet
 end
-```
 
-Queries and records can then opt into the whole group by name, which keeps call sites short and in sync when the group changes:
-
-```ruby
 Album.with_deferred(:booklet)
-album.load_deferred(:booklet)
 ```
 
-Groups can be mixed with column names, a column can belong to several groups, and declaring the same group again adds to it.
-
-### Loading deferred columns
-
-`with_deferred` adds deferred columns to the default ones, in the same query:
-
-```ruby
-Song.with_deferred(:lyrics).find_by(name: "Samba pa ti")
-Song.where(track: 1..3).with_deferred(:lyrics, :waveform)
-album.songs.with_deferred(:lyrics)
-```
-
-`with_deferred_columns` loads every column, including the deferred ones:
-
-```ruby
-Album.with_deferred_columns.find(id)
-```
-
-Passing a column that isn't deferred raises an `ArgumentError`, which catches typos early:
-
-```ruby
-Song.with_deferred(:lirycs)
-# ArgumentError: lirycs is not a deferred column of Song
-```
-
-An explicit `select` loads exactly the columns it names, deferred or not, and takes precedence over `with_deferred`:
-
-```ruby
-Song.select(:id, :name, :lyrics)
-```
-
-### Loading into a record you already have
-
-When a record comes from somewhere you can't add `with_deferred` to, such as a job argument or `self` in a callback, `load_deferred` loads the columns you name into it, in a single query:
-
-```ruby
-class RefreshLyricsJob < ApplicationJob
-  def perform(song)
-    song.load_deferred(:lyrics)
-    song.update!(lyrics: LyricsService.normalize(song.lyrics))
-  end
-end
-```
-
-Without arguments, it loads every deferred column the record doesn't have yet. It doesn't query when the columns are already loaded, or for new records.
-
-For several records, such as a preloaded association or an array, `DeferredColumns.load` does the same with one query per model:
-
-```ruby
-DeferredColumns.load(album.songs, :lyrics)
-```
-
-Records that already have the columns keep their values, so it only queries for what's missing. It reads the values without instantiating a record per row. Still, prefer `with_deferred` in the query that loads the records when you can, which needs no extra query.
+You can mix group and column names in a query. A column can belong to more
+than one group, and declaring a group again adds to it.
 
 ### Associations
 
-Associations, `preload`, `includes` and `eager_load` all leave deferred columns out.
-
-To load them along with an association, define an association with a scope:
+`Album.includes(:songs)` leaves out the lyrics, just like `album.songs`.
+To preload the lyrics too, use an association scope:
 
 ```ruby
 class Album < ApplicationRecord
@@ -178,41 +97,53 @@ end
 Album.includes(:songs_with_lyrics)
 ```
 
-It works with `preload`, `includes` and `eager_load`, and with `has_many :through`. In `eager_load`, opt-ins on the query apply to its own model:
+The same scope works with `preload`, `eager_load`, and `has_many :through`.
+In `Song.with_deferred(:lyrics).eager_load(:album)`, only the songs get the extra column.
+
+### Loading into a record you already have
+
+A job might receive a song without its lyrics. Use `load_deferred` to fetch them
+without replacing the record:
 
 ```ruby
-Song.with_deferred(:lyrics).eager_load(:album)
+class RefreshLyricsJob < ApplicationJob
+  def perform(song)
+    song.load_deferred(:lyrics)
+    song.update!(lyrics: LyricsService.normalize(song.lyrics))
+  end
+end
 ```
 
-Active Record skips preloading an association that is already loaded. When the records it has lack the deferred columns that the preload opts into, the library raises `NotLoadedError` instead of leaving them out:
+Without arguments, `load_deferred` fetches all missing deferred columns.
+It skips the query for new records or when the columns are already loaded.
+
+For a collection, load the missing columns with one query per model instead of one per record:
 
 ```ruby
-album.songs.load
-ActiveRecord::Associations::Preloader.new(records: [album], associations: :songs, scope: Song.with_deferred(:lyrics)).call
-# DeferredColumns::NotLoadedError: Album#songs was already loaded without Song#lyrics, ...
+DeferredColumns.load(album.songs, :lyrics)
 ```
+
+Both forms accept group names and leave values you've already loaded or assigned alone.
 
 ### Reading deferred columns
 
-Reading a deferred column that the query didn't load raises `DeferredColumns::NotLoadedError`, without running a query:
-
 ```ruby
 song = Song.first
-
-song.lyrics                  # raises DeferredColumns::NotLoadedError
 song.has_attribute?(:lyrics) # => false
-song.as_json                 # leaves lyrics out
+song.as_json                 # omits lyrics
+song.lyrics                  # raises DeferredColumns::NotLoadedError
 ```
 
-The error is a subclass of `ActiveModel::MissingAttributeError`, so existing rescues keep working. It also exposes `model` and `column`.
+`song[:lyrics]` and `song.read_attribute(:lyrics)` raise the same error.
+It's a subclass of `ActiveModel::MissingAttributeError` and has `model` and `column` readers.
 
-`song[:lyrics]` and `read_attribute(:lyrics)` raise the same error, instead of returning `nil` as Active Record does for other columns a query didn't select.
-
-New records have every column, so `Song.new.lyrics` works as usual.
+New records have all their columns. If you override an attribute reader, call
+`super` as usual.
 
 ### Reporting instead of raising
 
-Raising makes a missing `with_deferred` hard to miss in development and tests. In production, you might prefer to report it and keep the request working. `DeferredColumns.on_not_loaded` receives every `NotLoadedError` before it's raised:
+In production you may want to know where you missed a `with_deferred` without
+breaking the page:
 
 ```ruby
 # config/initializers/deferred_columns.rb
@@ -221,94 +152,59 @@ DeferredColumns.on_not_loaded = ->(error) {
 }
 ```
 
-When the handler doesn't raise, the library loads the missing column with an extra query and returns its value. The same applies to associations that were already loaded without the columns a preload opts into, which load them with one query per model.
+If the handler returns, `song.lyrics` fetches the lyrics and returns them. In a
+loop that's an extra query per song, so use the report to find the query that needs `with_deferred(:lyrics)`.
 
-That's one query per record when reading a column in a loop, so treat each report as a missing `with_deferred` to fix.
-
-### Overriding readers
-
-You can override the reader in the model and call `super`:
-
-```ruby
-class Song < ApplicationRecord
-  defer_columns :lyrics
-
-  def lyrics
-    super&.strip
-  end
-end
-```
+The same handler runs if you try to preload lyrics into an association that
+Active Record considers loaded. By default you get a `NotLoadedError` if the
+lyrics are missing. If the handler returns, the preloader fetches them in bulk.
 
 ### Writing records
 
-Saving a record only writes the columns that changed, so updating other columns leaves deferred columns untouched:
+You don't need to load the lyrics to update a song, even if you're updating the lyrics themselves:
 
 ```ruby
 song = Song.find_by(name: "El Nicoya")
-song.update!(composer: "José Areas")
-# UPDATE "songs" SET "composer" = 'José Areas' WHERE "songs"."id" = 9
-```
-
-Assigning a deferred column doesn't require loading it first:
-
-```ruby
+song.update!(composer: "José Areas") # leaves lyrics untouched
 song.update!(lyrics: "Instrumental")
 ```
 
 ### Validations
 
-A deferred column that wasn't loaded can't have changed, so its validations are skipped:
-
 ```ruby
 class Album < ApplicationRecord
   defer_columns :liner_notes
-
   validates :name, :liner_notes, presence: true
 end
 
 album = Album.find_by(name: "Abraxas")
-album.update!(name: "Abraxas (Remastered)")   # validates name, skips liner_notes
+album.update!(name: "Abraxas (Remastered)") # validates name, skips liner_notes
 ```
 
-The validations run as usual when the column was loaded or assigned, and on new records.
-
-> **Note**
->
-> This applies to validators such as `presence` or `length`. A custom `validate` method that reads a deferred column should check `has_attribute?` first.
-
-### Calculations
-
-Calculations build their own `SELECT`, and work the same with or without `with_deferred`:
-
-```ruby
-Song.with_deferred(:lyrics).where(album: abraxas).count
-# SELECT COUNT(*) FROM "songs" WHERE "songs"."album_id" = 1
-
-Song.where(album: abraxas).pluck(:lyrics)
-```
+Attribute validators such as `presence` and `length` skip a deferred column
+unless you loaded or assigned it. On new records they run as usual.
+In a custom `validate` method, check `has_attribute?(:liner_notes)` before reading it.
 
 ### Reloading
 
-`reload` keeps the deferred columns the record had loaded, reading their latest values in a second query, and leaves out the rest:
+`reload` remembers which deferred columns you loaded and refreshes those in a second query:
 
 ```ruby
 song = Song.with_deferred(:lyrics).find(id)
-song.reload.lyrics # works
+song.reload.lyrics # fresh lyrics, still no waveform
 ```
-
-### What it doesn't do
-
-- It doesn't load deferred columns lazily by default. A query per record is easy to miss and expensive in a loop, so missing columns raise instead, unless [`on_not_loaded`](#reporting-instead-of-raising) reports them.
-- It doesn't change raw SQL, such as `find_by_sql`.
-- It only changes reads. If a column is expensive to write, for example because of a large index, moving it to a separate table is still the better fit.
 
 ## How it works 🔧
 
-When a query doesn't select any columns, Active Record either selects `*` or, for models with [`ignored_columns`][ignored_columns], lists the remaining columns. This library adds deferred columns to that same decision in `Relation#build_select`.
+Active Record builds the default `SELECT` in `Relation#build_select`. For
+models with deferred columns, the gem lists the columns to fetch instead of
+selecting `*`. There's no `default_scope`, and models without deferred columns
+keep their usual queries. For `eager_load`, the gem adjusts the column list for
+each model in the join.
 
-`eager_load` builds its `SELECT` from each model's column names instead, so the library also adjusts those.
-
-`with_deferred` stores the requested columns as a relation extension, so they survive `merge` and association scopes, and `count` keeps counting rows.
+`with_deferred` keeps the requested columns in a relation extension, so they
+survive `merge` and association scopes without changing what `count` counts.
+`pluck` and `exists?` build their own selects. Raw SQL is unchanged.
 
 ## Compatibility
 
