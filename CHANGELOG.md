@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.0.4 (2026-11-19)
 
 - Add `unload_deferred`, to forget deferred columns in records created in tests, so they behave like records loaded by a query.
 
