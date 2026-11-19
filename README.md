@@ -125,6 +125,22 @@ DeferredColumns.load(album.songs, :lyrics)
 
 Both forms accept group names and leave values you've already loaded or assigned alone.
 
+### Testing
+
+A record created in a test keeps every column in memory, so a test passes even
+when the code under test reads a deferred column that production never loads.
+Use `unload_deferred` to forget them, as if the record had been loaded by a query:
+
+```ruby
+FactoryBot.define do
+  factory :song do
+    after(:create, &:unload_deferred)
+  end
+end
+```
+
+A test that does want the columns in memory calls `song.load_deferred(:lyrics)`.
+
 ### Reading deferred columns
 
 ```ruby

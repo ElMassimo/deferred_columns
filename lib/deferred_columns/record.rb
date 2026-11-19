@@ -13,6 +13,24 @@ module DeferredColumns
       self
     end
 
+    # Forgets deferred columns or groups, as if the record had been loaded
+    # without them. Without arguments, forgets every deferred column.
+    #
+    # Meant for tests: a record created in a test keeps every column in memory,
+    # so code that reads a deferred column it never loaded would pass the test
+    # and fail in production.
+    def unload_deferred(*names)
+      columns = DeferredColumns.deferred_columns!(self.class, names)
+      columns = self.class.deferred_columns if columns.empty?
+      changed = columns & changed_attribute_names_to_save
+      raise ArgumentError, "#{self.class.name} has unsaved changes to #{changed.join(', ')}" if changed.any?
+
+      columns.each do |column|
+        @attributes[column] = ActiveModel::Attribute.uninitialized(column, self.class.type_for_attribute(column))
+      end
+      self
+    end
+
     # Raises instead of returning nil for deferred columns that weren't loaded,
     # which also applies to `record[column]`.
     def read_attribute(name, &)

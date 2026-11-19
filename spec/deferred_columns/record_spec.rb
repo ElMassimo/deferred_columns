@@ -63,6 +63,40 @@ RSpec.describe 'Loading deferred columns into a record' do
     end
   end
 
+  describe 'unload_deferred' do
+    let!(:song) { Song.create!(name: 'Oye como va', lyrics: 'Oye como va', waveform: 'waveform-oye') }
+
+    it 'forgets the given columns without a query, as if the record had been loaded without them' do
+      expect(queries { expect(song.unload_deferred(:lyrics)).to equal(song) }).to be_empty
+
+      expect(song.has_attribute?(:lyrics)).to be(false)
+      expect(song.waveform).to eq('waveform-oye')
+      expect { song.lyrics }.to raise_error(DeferredColumns::NotLoadedError)
+      expect(song.changed?).to be(false)
+      expect(song.load_deferred(:lyrics).lyrics).to eq('Oye como va')
+    end
+
+    it 'forgets every deferred column when given none, and accepts groups' do
+      expect(song.unload_deferred.attributes.keys).to match_array(Song.default_select_columns)
+
+      album = Album.create!(name: 'Santana III', liner_notes: 'Notes', cover_art: 'Art')
+      expect(album.unload_deferred(:booklet).attributes.keys).to match_array(Album.default_select_columns)
+    end
+
+    it 'saves the record afterwards without touching the forgotten columns' do
+      song.unload_deferred.update!(name: 'Oye como va (live)')
+
+      expect(Song.with_deferred_columns.find(song.id)).to have_attributes(name: 'Oye como va (live)', lyrics: 'Oye como va')
+    end
+
+    it 'refuses to discard unsaved changes, and rejects columns that are not deferred' do
+      song.lyrics = 'Instrumental'
+
+      expect { song.unload_deferred(:lyrics) }.to raise_error(ArgumentError, 'Song has unsaved changes to lyrics')
+      expect { song.unload_deferred(:name) }.to raise_error(ArgumentError, 'name is not a deferred column or group of Song')
+    end
+  end
+
   describe 'DeferredColumns.load' do
     let!(:songs) { Album.find_by!(name: 'Abraxas').songs.to_a }
 

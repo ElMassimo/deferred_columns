@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add `unload_deferred`, to forget deferred columns in records created in tests, so they behave like records loaded by a query.
+
 ## 0.0.3 (2026-11-18)
 
 - Fix `NoMethodError` for the private `construct_join_dependency` when merging joins of another model, or in association scopes that reference an eager loaded association.
